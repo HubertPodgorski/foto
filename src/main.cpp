@@ -3,6 +3,8 @@
 #include <Wire.h>
 #include <LiquidCrystal_I2C.h>
 
+#include <RaceHandler.h>
+
 LiquidCrystal_I2C lcd(0x27,20,4);
 
 #define FRONT_SENSOR_PIN 3
@@ -43,13 +45,6 @@ bool light2On = false;
 bool light3On = false;
 bool light4On = false;
 
-enum AppState {
-  RACING,
-  STOP
-};
-
-AppState appState = STOP;
-
 void CleanupAllData();
 void DisplayResults();
 char * TimeToString(unsigned long givenMsTime);
@@ -59,38 +54,8 @@ void DisplayRaceTime();
 void CheckTurnOnLights();
 void TurnOffAllLights();
 
-void FrontSensorBroken() {
-  if(appState != RACING) {
-    return;
-  }
-
-  sensorFrontState = digitalRead(FRONT_SENSOR_PIN);
-  Serial.println(sensorFrontState);
-
-  if (sensorFrontState != HIGH) {
-    return;
-  }
-
-  if (!dogEnterTriggerTime) {
-    dogEnterTriggerTime = millis();
-    
-    return;
-  }
-
-  if (!dogExitTriggerTime && millis() - dogEnterTriggerTime > msDelayDogLap ) {
-    dogExitTriggerTime = millis();
-  }
-}
-
-void BoxSensorBroken() {
-  if(appState != RACING) {
-    return;
-  }
-
-  boxSensorState = digitalRead(BOX_SENSOR_PIN);
-  Serial.print("boxSensorState => ");
-  Serial.println(boxSensorState);
-}
+void Sensor1Wrapper();
+void Sensor2Wrapper();
 
 void setup() {
   Serial.begin(9600);
@@ -105,8 +70,8 @@ void setup() {
 
   CleanupAllData();
 
-  attachInterrupt(digitalPinToInterrupt(FRONT_SENSOR_PIN), FrontSensorBroken, CHANGE);
-  attachInterrupt(digitalPinToInterrupt(BOX_SENSOR_PIN), BoxSensorBroken, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(FRONT_SENSOR_PIN), Sensor1Wrapper, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(BOX_SENSOR_PIN), Sensor2Wrapper, CHANGE);
 }
 
 void loop() {
@@ -337,4 +302,14 @@ char * TimeToString(unsigned long givenMsTime) {
   sprintf(str, "%01ds %02dms", seconds, ms);
 
   return str;
+}
+
+void Sensor2Wrapper()
+{
+   RaceHandler.TriggerSensor2();
+}
+
+void Sensor1Wrapper()
+{
+   RaceHandler.TriggerSensor1();
 }
