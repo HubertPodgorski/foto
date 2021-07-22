@@ -3,8 +3,10 @@
 #include <Wire.h>
 #include <LiquidCrystal_I2C.h>
 
+#include "Structs.h"
 #include <RaceHandler.h>
 #include <LightsController.h>
+#include <LCDController.h>
 
 LiquidCrystal_I2C lcd(0x27,20,4);
 
@@ -18,9 +20,6 @@ LiquidCrystal_I2C lcd(0x27,20,4);
 
 #define BUTTON_PIN 7
 
-
-//#define FRONT_SENSOR_LED_PIN A0
-
 long startTime; // When Sensor 1 is triggered
 long elapsedTime;
 long lastTriggerTime;
@@ -29,13 +28,12 @@ volatile long dogEnterTriggerTime;
 long lastLightsTriggerTime;
 long dogEnterTime;
 long dogLapTime;
-long lastButtonPressTime;
+unsigned long lastButtonPressTime;
 
 volatile int sensorFrontState; // Front sensor status
 volatile int boxSensorState; // Front sensor status
 
-int msDelayDogLap = 1000;
-int msButtonDelay = 300;
+unsigned long msButtonDelay = 300;
 
 bool earlyEnter = false;
 bool showingResults = false;
@@ -53,6 +51,17 @@ void CheckButtonTrigger();
 void DisplayRaceTime();
 void CheckTurnOnLights();
 void TurnOffAllLights();
+void StartStopRace();
+void ResetRace();
+
+
+uint8_t CurrentDog;
+uint8_t CurrentRaceState;
+
+char DogTime[8];
+char DogCrossingTime[8];
+char ElapsedRaceTime[8];
+char TotalCrossingTime[8];
 
 void Sensor1Wrapper();
 void Sensor2Wrapper();
@@ -67,6 +76,8 @@ void setup() {
 
   lcd.backlight();
   lcd.init();
+
+  LCDController.init(&lcd);
 
   CleanupAllData();
 
@@ -83,154 +94,114 @@ void loop() {
   LightsController.Main();
 
   //Handle Race main processing
-   RaceHandler.Main();
+  RaceHandler.Main();
+
+  //Handle LCD processing
+  LCDController.Main();
 
   /* 
    *  Checking button trigger action and determining state
   */
   CheckButtonTrigger();
 
-  /* 
-   *  Handle app state - RACING - dog is running, lights are turned on
-  */
-  if (appState == RACING) {
-    DisplayRaceTime();
+  //Update LCD Display fields
+  //Update team time to display
+  dtostrf(RaceHandler.GetRaceTime(), 7, 3, ElapsedRaceTime);
+  LCDController.UpdateField(LCDController.TeamTime, ElapsedRaceTime);
 
-    /* checking light to turn on */
-    if (!lastLightsTriggerTime) {
-      CheckTurnOnLights();
-    }
-  }
+  //Update total crossing time
+   dtostrf(RaceHandler.GetTotalCrossingTime(), 7, 3, TotalCrossingTime);
+   LCDController.UpdateField(LCDController.TotalCrossTime, TotalCrossingTime);
 
-  /* JUST BEFORE CROSSES COME */
-  if (dogEnterTriggerTime && dogExitTriggerTime) {
-    appState = STOP;
-  }
+   //Update race status to display
+   LCDController.UpdateField(LCDController.RaceState, RaceHandler.GetRaceStateString());
 
-  /* 
-   *  Handle app state - RESULTS - app is displaying result
-  */
-  if (appState == STOP) {
-    if ((dogEnterTriggerTime && !dogEnterTime) || (dogExitTriggerTime && !dogLapTime)) {
-      CalculateResults();
-    }
+   //Handle individual dog info
+   dtostrf(RaceHandler.GetDogTime(0), 7, 3, DogTime);
+   LCDController.UpdateField(LCDController.D1Time, DogTime);
+   LCDController.UpdateField(LCDController.D1CrossTime, RaceHandler.GetCrossingTime(0));
+   LCDController.UpdateField(LCDController.D1RerunInfo, RaceHandler.GetRerunInfo(0));
 
-    
-    if (!showingResults) {
-      DisplayResults();
-    }
-  }
+   dtostrf(RaceHandler.GetDogTime(1), 7, 3, DogTime);
+   LCDController.UpdateField(LCDController.D2Time, DogTime);
+   LCDController.UpdateField(LCDController.D2CrossTime, RaceHandler.GetCrossingTime(1));
+   LCDController.UpdateField(LCDController.D2RerunInfo, RaceHandler.GetRerunInfo(1));
+
+   dtostrf(RaceHandler.GetDogTime(2), 7, 3, DogTime);
+   LCDController.UpdateField(LCDController.D3Time, DogTime);
+   LCDController.UpdateField(LCDController.D3CrossTime, RaceHandler.GetCrossingTime(2));
+   LCDController.UpdateField(LCDController.D3RerunInfo, RaceHandler.GetRerunInfo(2));
+
+   dtostrf(RaceHandler.GetDogTime(3), 7, 3, DogTime);
+   LCDController.UpdateField(LCDController.D4Time, DogTime);
+   LCDController.UpdateField(LCDController.D4CrossTime, RaceHandler.GetCrossingTime(3));
+   LCDController.UpdateField(LCDController.D4RerunInfo, RaceHandler.GetRerunInfo(3));
+
+  if (CurrentRaceState != RaceHandler.RaceState) {
+    // TODO: do logging
+      if (RaceHandler.RaceState == RaceHandler.STOP) {
+         //Race is finished, put final data on screen
+        //  dtostrf(RaceHandler.GetDogTime(RaceHandler.CurrentDog, -2), 7, 3, DogTime);
+        //  ESP_LOGI(__FILE__, "D%i: %s|CR: %s", RaceHandler.CurrentDog, DogTime, RaceHandler.GetCrossingTime(RaceHandler.CurrentDog, -2).c_str());
+        //  ESP_LOGI(__FILE__, "RT:%s", ElapsedRaceTime);
+      }
+      // ESP_LOGI(__FILE__, "RS: %i", RaceHandler.RaceState);
+   }
+
+   if (RaceHandler.CurrentDog != CurrentDog) {
+    //  TODO: do logging
+      // dtostrf(RaceHandler.GetDogTime(RaceHandler.iPreviousDog, -2), 7, 3, DogTime);
+      // ESP_LOGI(__FILE__, "D%i: %s|CR: %s", RaceHandler.iPreviousDog, DogTime, RaceHandler.GetCrossingTime(RaceHandler.iPreviousDog, -2).c_str());
+      // ESP_LOGI(__FILE__, "D: %i", RaceHandler.CurrentDog);
+      // ESP_LOGI(__FILE__, "RT:%s", ElapsedRaceTime);
+   }
+
+   //Cleanup variables used for checking if something changed
+   CurrentDog = RaceHandler.CurrentDog;
+   CurrentRaceState = RaceHandler.RaceState;
 }
 
 void CheckButtonTrigger() {
   int buttonState = digitalRead(BUTTON_PIN);
 
-  if (buttonState == LOW || (millis() - lastButtonPressTime < msButtonDelay)) {
-    return;
-  }
-
-  lastButtonPressTime = millis();
-
-  if (appState == RACING) {
-    appState = STOP;
-  } else {
-    CleanupAllData();
-    
-    appState = RACING;
-  }
+  if (buttonState == HIGH && (millis() - lastButtonPressTime >= msButtonDelay)) {
+    StartStopRace();
+  };
 }
 
-void DisplayRaceTime() {
-  /* needed? - showing time on display - move to method */
-  if (lastLightsTriggerTime && !showingResults) {
-    lcd.setCursor(0, 0);
-    lcd.print("Czas: ");
-    lcd.print(TimeToString(millis() - lastLightsTriggerTime));
-  }
+/// <summary>
+///   Starts (if stopped) or stops (if started) a race. Start is only allowed if race is stopped and reset.
+/// </summary>
+void StartStopRace() {
+   lastButtonPressTime = millis();
+  //If race is stopped and timers are zero
+  if (RaceHandler.RaceState == RaceHandler.STOP && RaceHandler.GetRaceTime() == 0) {
+      //Then start the race
+      // ESP_LOGD(__FILE__, "%lu: START!", millis());
+      LightsController.InitiateStartSequence();
+      RaceHandler.StartRace();
+   } else if (RaceHandler.RaceState == RaceHandler.STOP && RaceHandler.GetRaceTime() != 0) {
+     ResetRace();
+   } else {
+      RaceHandler.StopRace();
+      LightsController.DeleteSchedules();
+   }
 }
 
-void CleanupAllData() {
-  lcd.clear();
-  startTime = millis();
-  dogEnterTriggerTime = 0;
-  dogExitTriggerTime = 0;
-  showingResults = false;
-  earlyEnter = false;
-  dogEnterTime = 0;
-  dogLapTime = 0;
-  lastLightsTriggerTime = 0;
-  lastTriggerTime = 0;
-  showingWaitingMessage = false;
-  TurnOffAllLights();
+/// <summary>
+///   Reset race so new one can be started, reset is only allowed when race is stopped
+/// </summary>
+void ResetRace() {
+   if (RaceHandler.RaceState != RaceHandler.STOP) {
+      return;
+   }
+
+  //  TODO: 
+  // <<<<<<>>>>>>>>>>
+   LightsController.ResetLights();
+   RaceHandler.ResetRace();
+  // <<<<<<>>>>>>>>>>
 }
-
-void DisplayResults() {
-  lcd.clear();
-
-  if (dogEnterTime) {
-    lcd.setCursor(0, 0);
-    lcd.print("Wej");
-    if (earlyEnter) {
-       lcd.print(" [E]");  
-    }
-    lcd.print(": ");
-  
-    lcd.print(TimeToString(dogEnterTime));
-  }
-
-  if (dogLapTime) {
-    lcd.setCursor(0, 1);
-    lcd.print("Bieg: ");
-    lcd.print(TimeToString(dogLapTime));
-  }
-
-  if (!dogEnterTime && !dogLapTime) {
-    lcd.clear();
-    lcd.setCursor(0, 0);
-    lcd.print("Przerwano");
-  }
-
-  showingResults = true;
-}
-
-void CalculateResults() {
-  if (dogEnterTriggerTime && lastLightsTriggerTime) {
-    if (dogEnterTriggerTime > lastLightsTriggerTime) {
-      dogEnterTime = dogEnterTriggerTime - lastLightsTriggerTime;
-    } else {
-      earlyEnter = true;
-      dogEnterTime = lastLightsTriggerTime - dogEnterTriggerTime;
-    }
-  }
-
-  if (dogExitTriggerTime && dogEnterTriggerTime) {
-    dogLapTime = dogExitTriggerTime - dogEnterTriggerTime;
-  }
-
-    Serial.println("<=======>");
-
-     Serial.print("dogEnterTime => ");
-     Serial.println(dogEnterTime);
-
-     Serial.print("dogLapTime => ");
-     Serial.println(dogLapTime);
-
-     
-     Serial.println("<=======>");
-};
-
-void TurnOffAllLights() {
-  digitalWrite(LIGHT_PIN_1, LOW);
-  digitalWrite(LIGHT_PIN_2, LOW);
-  digitalWrite(LIGHT_PIN_3, LOW);
-  digitalWrite(LIGHT_PIN_4, LOW);
-
-  light1On = false;
-  light2On = false;
-  light3On = false;
-  light4On = false;
-}
-  
 
 char * TimeToString(unsigned long givenMsTime) {
   static char str[9];
