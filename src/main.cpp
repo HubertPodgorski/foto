@@ -4,11 +4,12 @@
 #include <LiquidCrystal_I2C.h>
 
 #include <RaceHandler.h>
+#include <LightsController.h>
 
 LiquidCrystal_I2C lcd(0x27,20,4);
 
-#define FRONT_SENSOR_PIN 3
-#define BOX_SENSOR_PIN 2
+#define SENSOR_1_PIN 3
+#define SENSOR_2_PIN 2
 
 #define LIGHT_PIN_1 4
 #define LIGHT_PIN_2 11
@@ -33,7 +34,6 @@ long lastButtonPressTime;
 volatile int sensorFrontState; // Front sensor status
 volatile int boxSensorState; // Front sensor status
 
-int msBetweenLights = 1000;
 int msDelayDogLap = 1000;
 int msButtonDelay = 300;
 
@@ -70,11 +70,21 @@ void setup() {
 
   CleanupAllData();
 
-  attachInterrupt(digitalPinToInterrupt(FRONT_SENSOR_PIN), Sensor1Wrapper, CHANGE);
-  attachInterrupt(digitalPinToInterrupt(BOX_SENSOR_PIN), Sensor2Wrapper, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(SENSOR_1_PIN), Sensor1Wrapper, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(SENSOR_2_PIN), Sensor2Wrapper, CHANGE);
+
+  LightsController.Init(LIGHT_PIN_1, LIGHT_PIN_2, LIGHT_PIN_3, LIGHT_PIN_4);
 }
 
 void loop() {
+  /*
+   Handle lights and start timer on green
+  */
+  LightsController.Main();
+
+  //Handle Race main processing
+   RaceHandler.Main();
+
   /* 
    *  Checking button trigger action and determining state
   */
@@ -207,78 +217,7 @@ void CalculateResults() {
 
      
      Serial.println("<=======>");
-}
-
-void CheckTurnOnLights() {
-  if (!light1On) {
-      lastTriggerTime = millis();
-
-      lcd.clear();
-      lcd.setCursor(0, 0);
-      lcd.print("3!");
-      
-      Serial.println("turn on 1");
-
-      digitalWrite(LIGHT_PIN_1, HIGH);
-
-      light1On = true;
-    }
-
-    if (!light2On && light1On) {
-      // TODO: between lights time
-      if (millis() - lastTriggerTime >= msBetweenLights) {
-        lastTriggerTime = millis();
-
-        Serial.println("turn on 2");
-
-        lcd.clear();
-        lcd.setCursor(0, 0);
-        lcd.print("2!");
-
-        digitalWrite(LIGHT_PIN_1, LOW);
-        digitalWrite(LIGHT_PIN_2, HIGH);
-
-        light2On = true;
-      }
-    }
-
-    if (!light3On && light2On) {
-      // TODO: between lights time
-      if (millis() - lastTriggerTime >= msBetweenLights) {
-        lastTriggerTime = millis();
-
-        Serial.println("turn on 3");
-
-        lcd.clear();
-        lcd.setCursor(0, 0);
-        lcd.print("1!");
-
-        digitalWrite(LIGHT_PIN_2, LOW);
-        digitalWrite(LIGHT_PIN_3, HIGH);
-      
-        light3On = true;
-      }
-    }
-
-    if (!light4On && light3On) {
-      // TODO: between lights time
-      if (millis() - lastTriggerTime >= msBetweenLights) {
-        lastTriggerTime = millis();
-        lastLightsTriggerTime = millis();
-
-        Serial.println("turn on 4");
-
-        lcd.clear();
-        lcd.setCursor(0, 0);
-        lcd.print("START");
-
-        digitalWrite(LIGHT_PIN_3, LOW);
-        digitalWrite(LIGHT_PIN_4, HIGH);
-
-        light4On = true;
-      } 
-    }
-}
+};
 
 void TurnOffAllLights() {
   digitalWrite(LIGHT_PIN_1, LOW);
