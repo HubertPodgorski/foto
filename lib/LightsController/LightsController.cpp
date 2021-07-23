@@ -31,6 +31,61 @@ void LightsControllerClass::Main() {
 }
 
 /// <summary>
+///   Initiate start sequence, should be called if starting lights sequence should be initiated.
+/// </summary>
+void LightsControllerClass::InitiateStartSequence() {
+   OverallState = STARTING;
+}
+
+/// <summary>
+///   Deletes any scheduled light timings.
+/// </summary>
+void LightsControllerClass::DeleteSchedules() {
+   //Delete any set schedules
+   for (int lightIndex = 0; lightIndex < 4; lightIndex++) {
+      _LightsOnSchedule[lightIndex] = 0;  //Delete schedule
+      _LightsOffSchedule[lightIndex] = 0; //Delete schedule
+   }
+}
+
+/// <summary>
+///   Resets the lights (turn everything OFF).
+/// </summary>
+void LightsControllerClass::ResetLights() {
+   OverallState = STOP;
+   DeleteSchedules();
+}
+
+/// <summary>
+///   Gets race state string. Internally the software uses a (enumerated) byte to keep the race
+///   state, however on the display we have to display english text. This function returns the
+///   correct english text for the current race state.
+/// </summary>
+///
+/// <returns>
+///   The race state string.
+/// </returns>
+String RaceHandlerClass::GetRaceStateString() {
+   String strRaceState;
+   
+   switch (RaceState) {
+      case RaceHandlerClass::STOP:
+         strRaceState = " STOP";
+         break;
+      case RaceHandlerClass::STARTING:
+         strRaceState = " STARTING";
+         break;
+      case RaceHandlerClass::RACING:
+         strRaceState = "RACING";
+         break;
+      default:
+         break;
+   }
+
+   return strRaceState;
+}
+
+/// <summary>
 ///   Handles the start sequence, will be called by main function when oceral race state is
 ///   STARTING.
 /// </summary>

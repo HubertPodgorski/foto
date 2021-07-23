@@ -1,6 +1,8 @@
 #ifndef _LIGHTSCONTROLLER_h
 #define _LIGHTSCONTROLLER_h
+
 #include "Arduino.h"
+#include "Structs.h"
 
 class LightsControllerClass {
    public:
@@ -14,6 +16,8 @@ class LightsControllerClass {
       };
       LightStates CheckLightState(int LightIndex);
       void SetLightState(int LightIndex, LightStates LightState);
+
+      void InitiateStartSequence();
       
       enum OverallStates {
          STARTING,
@@ -21,6 +25,9 @@ class LightsControllerClass {
          STOP
       };
       OverallStates OverallState = STOP;
+
+      void DeleteSchedules();
+      void ResetLights();
 
    private: 
       unsigned long _LightsOnSchedule[4];

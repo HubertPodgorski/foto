@@ -1,18 +1,17 @@
-#include "Structs.h"
 #ifndef _RACEHANDLER_h
 #define _RACEHANDLER_h
 
 #include "Arduino.h"
+#include "Structs.h"
 
 #define NUM_HISTORIC_RACE_RECORDS 100
 
-class RaceHandlerClass
-{
+class RaceHandlerClass {
    public:
    
-      uint8_t CurrentDog;
-      uint8_t PreviousDog;
-      uint8_t NextDog;
+      uint8_t CurrentDogIndex;
+      uint8_t PreviousDogIndex;
+      uint8_t NextDogIndex;
       void init(uint8_t Sensor1Pin, uint8_t Sensor2Pin);
 
       enum RaceStates {
@@ -39,16 +38,23 @@ class RaceHandlerClass
       void SetDogFault(uint8_t DogIndex, DogFaults State = TOGGLE);
       void StopRace();
       void StopRace(unsigned long StopTime);
+      double GetRaceTime();
       RaceData GetRaceData();
       RaceData GetRaceData(unsigned int RaceId);
       long GetTotalCrossingTimeMillis();
+      double GetTotalCrossingTime();
       double GetDogTime(uint8_t DogIndex, int8_t RunNumber = -1);
       unsigned long GetDogTimeMillis(uint8_t DogIndex, int8_t RunNumber = -1);
       String GetCrossingTime(uint8_t DogIndex, int8_t RunNumber = -1);
       unsigned long GetCrossingTimeMillis(uint8_t DogIndex, int8_t RunNumber = -1);
+      void StartRace();
+      String GetRerunInfo(uint8_t DogIndex);
+
+      String GetRaceStateString();
 
 
    private:
+      bool _Fault;
       uint8_t _Sensor1Pin;
       uint8_t _Sensor2Pin;
       unsigned long _LastTransitionStringUpdate;
@@ -70,12 +76,12 @@ class RaceHandlerClass
 
       String _Transition;
 
-      enum _DogRunDirection
+      enum _DogRunDirections
       {
          GOINGIN,
          COMINGBACK
       };
-      _DogRunDirection _DogRunDirection;
+      _DogRunDirections _DogRunDirection;
 
       struct SensorTriggerRecord {
          volatile uint8_t sensorNumber;
@@ -93,8 +99,13 @@ class RaceHandlerClass
       void _ChangeRaceState(RaceStates _NewRaceState);
       bool _QueueEmpty();
       SensorTriggerRecord _QueuePop();
+      void _ChangeDogIndex(uint8_t _NewDogIndex);
 
       RaceData _HistoricRaceData[NUM_HISTORIC_RACE_RECORDS];
+
+      void _AddToTransitionString(SensorTriggerRecord _InterruptTrigger);
+
+      void _ChangeDogRunDirection(_DogRunDirections NewDogRunDirection);
 };
 
 extern RaceHandlerClass RaceHandler;

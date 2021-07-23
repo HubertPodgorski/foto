@@ -20,42 +20,17 @@ LiquidCrystal_I2C lcd(0x27,20,4);
 
 #define BUTTON_PIN 7
 
-long startTime; // When Sensor 1 is triggered
-long elapsedTime;
-long lastTriggerTime;
-volatile long dogExitTriggerTime;
-volatile long dogEnterTriggerTime;
-long lastLightsTriggerTime;
-long dogEnterTime;
-long dogLapTime;
 unsigned long lastButtonPressTime;
-
-volatile int sensorFrontState; // Front sensor status
-volatile int boxSensorState; // Front sensor status
 
 unsigned long msButtonDelay = 300;
 
-bool earlyEnter = false;
-bool showingResults = false;
-bool showingWaitingMessage = false;
-bool light1On = false;
-bool light2On = false;
-bool light3On = false;
-bool light4On = false;
-
-void CleanupAllData();
-void DisplayResults();
 char * TimeToString(unsigned long givenMsTime);
-void CalculateResults();
 void CheckButtonTrigger();
-void DisplayRaceTime();
-void CheckTurnOnLights();
-void TurnOffAllLights();
 void StartStopRace();
 void ResetRace();
 
 
-uint8_t CurrentDog;
+uint8_t CurrentDogIndex;
 uint8_t CurrentRaceState;
 
 char DogTime[8];
@@ -78,8 +53,6 @@ void setup() {
   lcd.init();
 
   LCDController.init(&lcd);
-
-  CleanupAllData();
 
   attachInterrupt(digitalPinToInterrupt(SENSOR_1_PIN), Sensor1Wrapper, CHANGE);
   attachInterrupt(digitalPinToInterrupt(SENSOR_2_PIN), Sensor2Wrapper, CHANGE);
@@ -141,23 +114,23 @@ void loop() {
     // TODO: do logging
       if (RaceHandler.RaceState == RaceHandler.STOP) {
          //Race is finished, put final data on screen
-        //  dtostrf(RaceHandler.GetDogTime(RaceHandler.CurrentDog, -2), 7, 3, DogTime);
-        //  ESP_LOGI(__FILE__, "D%i: %s|CR: %s", RaceHandler.CurrentDog, DogTime, RaceHandler.GetCrossingTime(RaceHandler.CurrentDog, -2).c_str());
+        //  dtostrf(RaceHandler.GetDogTime(RaceHandler.CurrentDogIndex, -2), 7, 3, DogTime);
+        //  ESP_LOGI(__FILE__, "D%i: %s|CR: %s", RaceHandler.CurrentDogIndex, DogTime, RaceHandler.GetCrossingTime(RaceHandler.CurrentDogIndex, -2).c_str());
         //  ESP_LOGI(__FILE__, "RT:%s", ElapsedRaceTime);
       }
       // ESP_LOGI(__FILE__, "RS: %i", RaceHandler.RaceState);
    }
 
-   if (RaceHandler.CurrentDog != CurrentDog) {
+   if (RaceHandler.CurrentDogIndex != CurrentDogIndex) {
     //  TODO: do logging
       // dtostrf(RaceHandler.GetDogTime(RaceHandler.iPreviousDog, -2), 7, 3, DogTime);
       // ESP_LOGI(__FILE__, "D%i: %s|CR: %s", RaceHandler.iPreviousDog, DogTime, RaceHandler.GetCrossingTime(RaceHandler.iPreviousDog, -2).c_str());
-      // ESP_LOGI(__FILE__, "D: %i", RaceHandler.CurrentDog);
+      // ESP_LOGI(__FILE__, "D: %i", RaceHandler.CurrentDogIndex);
       // ESP_LOGI(__FILE__, "RT:%s", ElapsedRaceTime);
    }
 
    //Cleanup variables used for checking if something changed
-   CurrentDog = RaceHandler.CurrentDog;
+   CurrentDogIndex = RaceHandler.CurrentDogIndex;
    CurrentRaceState = RaceHandler.RaceState;
 }
 
@@ -195,12 +168,9 @@ void ResetRace() {
    if (RaceHandler.RaceState != RaceHandler.STOP) {
       return;
    }
-
-  //  TODO: 
-  // <<<<<<>>>>>>>>>>
+   
    LightsController.ResetLights();
    RaceHandler.ResetRace();
-  // <<<<<<>>>>>>>>>>
 }
 
 char * TimeToString(unsigned long givenMsTime) {
@@ -214,12 +184,10 @@ char * TimeToString(unsigned long givenMsTime) {
   return str;
 }
 
-void Sensor2Wrapper()
-{
+void Sensor2Wrapper() {
    RaceHandler.TriggerSensor2();
 }
 
-void Sensor1Wrapper()
-{
+void Sensor1Wrapper() {
    RaceHandler.TriggerSensor1();
 }
